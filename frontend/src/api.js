@@ -1,36 +1,54 @@
-import axios from 'axios';
+import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+  headers: { 'Content-Type': 'application/json' },
+})
+
+const authClient = (token) =>
+  axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  })
 
 export const aegisApi = {
-  /**
-   * Sends the user's natural language prompt to the AI agent.
-   */
   async getChatPlan(prompt) {
-    const response = await apiClient.post('/agent/chat', { prompt });
-    return response.data;
+    const res = await apiClient.post('/agent/chat', { prompt })
+    return res.data
   },
 
-  /**
-   * Executes a specific action. 
-   * Requires a valid Auth0 Access Token for high-risk actions.
-   */
-  async executeAction(action, token = null) {
-    const config = {};
-    if (token) {
-      config.headers = {
-        Authorization: `Bearer ${token}`,
-      };
-    }
-    
-    const response = await apiClient.post('/agent/execute', action, config);
-    return response.data;
-  }
-};
+  async executeAction(action, token) {
+    const res = await authClient(token).post('/agent/execute', action)
+    return res.data
+  },
+
+  async getPolicies() {
+    const res = await apiClient.get('/policies')
+    return res.data
+  },
+
+  async getAuditLogs(token) {
+    const res = await authClient(token).get('/audit/logs')
+    return res.data
+  },
+
+  async getCloudState(token) {
+    const res = await authClient(token).get('/audit/state')
+    return res.data
+  },
+
+  async getConsentRecords(token) {
+    const res = await authClient(token).get('/audit/consents')
+    return res.data
+  },
+
+  async getVaultConnections(token) {
+    const res = await authClient(token).get('/vault/connections')
+    return res.data
+  },
+}

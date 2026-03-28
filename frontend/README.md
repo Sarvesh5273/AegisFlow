@@ -1,16 +1,77 @@
-# React + Vite
+# AegisFlow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Policy-Enforced Consent for Autonomous AI Agents**
 
-Currently, two official plugins are available:
+AegisFlow is a zero-trust execution layer for AI agents. It intercepts high-risk cloud operations, requires explicit user consent via Auth0 Token Vault, and produces a verifiable audit trail of every action.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Built for the [Authorized to Act Hackathon](https://auth0.devpost.com) — Auth0 for AI Agents.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Architecture
 
-## Expanding the ESLint configuration
+```
+User Prompt
+    ↓
+LLM (Groq llama-3.3-70b) → ActionPlan
+    ↓
+Policy Engine → DecisionResult (allowed / requires_auth)
+    ↓
+[If requires_auth]
+Auth0 Token Vault → Scoped JWT
+    ↓
+/agent/execute → verify_token → scope check → Executor → SQLite audit log
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Backend | FastAPI, Python 3.9+ |
+| LLM | Groq API (llama-3.3-70b-versatile) via instructor |
+| Identity | Auth0 (JWT RS256, Token Vault, step-up auth) |
+| Audit | SQLite |
+| Frontend | React + Vite |
+
+## Setup
+
+### Backend
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill in your values
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # fill in your values
+npm run dev
+```
+
+## Auth0 Setup
+
+1. Create a tenant (e.g. `aegisflow.us.auth0.com`)
+2. Register a **Single Page Application** → copy Client ID to frontend `.env`
+3. Register an **API** with identifier `https://api.aegisflow.local` → add scope `execute:high_risk`
+4. Create a **Machine-to-Machine Application** for Token Vault management → copy to backend `.env`
+5. Enable a social connection (GitHub / Google) with **Token Vault** enabled
+
+## Key Endpoints
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| `POST /agent/chat` | None | LLM parses prompt → policy decision |
+| `POST /agent/execute` | JWT + scope | Executes action, writes audit log |
+| `GET /vault/connections` | JWT | Lists Token Vault connections |
+| `GET /vault/token/{connection}` | JWT | Retrieves vault token (agent use only) |
+| `GET /audit/logs` | JWT | Action history |
+| `GET /audit/state` | JWT | Cloud resource state |
+| `GET /audit/consents` | JWT | Consent records |
+| `GET /policies` | None | Policy registry |

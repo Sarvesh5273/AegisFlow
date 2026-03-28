@@ -7,3 +7,4 @@ pydantic
 eval_type_backport
 pyjwt
 cryptography
+httpx
