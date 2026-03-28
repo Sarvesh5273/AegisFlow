@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+instructor
+groq
+pydantic
+eval_type_backport
+pyjwt
+cryptography
