@@ -1,9 +1,6 @@
 """
-Auth0 Token Vault client.
-
-Token Vault stores third-party OAuth tokens (GitHub, Google, etc.) on behalf
-of users. The agent retrieves these tokens to call external APIs without ever
-seeing the user's raw credentials.
+Auth0 Token Vault — retrieves stored third-party OAuth tokens (GitHub, Google, etc.)
+so the AI agent can call external APIs without ever seeing raw user credentials.
 
 Docs: https://auth0.com/docs/secure/tokens/token-vault
 """
@@ -15,104 +12,130 @@ from dotenv import load_dotenv
 load_dotenv()
 
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN")
-AUTH0_MANAGEMENT_CLIENT_ID = os.environ.get("AUTH0_MGMT_CLIENT_ID")
-AUTH0_MANAGEMENT_CLIENT_SECRET = os.environ.get("AUTH0_MGMT_CLIENT_SECRET")
+AUTH0_MGMT_CLIENT_ID = os.environ.get("AUTH0_MGMT_CLIENT_ID")
+AUTH0_MGMT_CLIENT_SECRET = os.environ.get("AUTH0_MGMT_CLIENT_SECRET")
 
 
-async def get_management_token() -> str:
+async def _get_management_token() -> str:
     """
-    Fetch a Machine-to-Machine token for the Auth0 Management API.
-    Used to call Token Vault endpoints on behalf of the agent.
+    Obtain a short-lived M2M token for the Auth0 Management API.
+    This is the gateway to Token Vault — the agent uses this to retrieve
+    stored user credentials without them being exposed in the frontend.
     """
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"https://{AUTH0_DOMAIN}/oauth/token",
             json={
                 "grant_type": "client_credentials",
-                "client_id": AUTH0_MANAGEMENT_CLIENT_ID,
-                "client_secret": AUTH0_MANAGEMENT_CLIENT_SECRET,
+                "client_id": AUTH0_MGMT_CLIENT_ID,
+                "client_secret": AUTH0_MGMT_CLIENT_SECRET,
                 "audience": f"https://{AUTH0_DOMAIN}/api/v2/",
             },
+            timeout=10.0,
         )
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to obtain Auth0 Management token for Token Vault access.",
-            )
-        return response.json()["access_token"]
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to obtain Auth0 Management token: {response.text}",
+        )
+    return response.json()["access_token"]
 
 
-async def retrieve_vault_token(user_id: str, connection: str) -> dict:
+async def get_github_token_from_vault(user_id: str) -> str:
     """
-    Retrieve a stored third-party token from Auth0 Token Vault for a given user.
+    Retrieve the user's GitHub OAuth token from Auth0 Token Vault.
+
+    This is the core Token Vault pattern:
+    1. Agent has the user's Auth0 sub (user_id) from the JWT
+    2. Agent calls Management API using M2M credentials (never user-visible)
+    3. Auth0 returns the stored GitHub token from the vault
+    4. Agent uses it to call GitHub API — user's credential never left Auth0
 
     Args:
-        user_id:    Auth0 user sub (e.g. "auth0|abc123")
-        connection: The social connection name (e.g. "github", "google-oauth2")
+        user_id: Auth0 user sub, e.g. "github|12345678"
 
     Returns:
-        dict with 'access_token' and token metadata from the vault.
+        GitHub access token string
     """
-    mgmt_token = await get_management_token()
+    mgmt_token = await _get_management_token()
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"https://{AUTH0_DOMAIN}/api/v2/users/{user_id}/identities",
+            f"https://{AUTH0_DOMAIN}/api/v2/users/{user_id}",
             headers={"Authorization": f"Bearer {mgmt_token}"},
+            timeout=10.0,
         )
 
-        if response.status_code == 404:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No Token Vault entry found for user '{user_id}' on connection '{connection}'.",
-            )
-
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Token Vault retrieval failed.",
-            )
-
-        identities = response.json()
-        for identity in identities:
-            if identity.get("provider") == connection:
-                token_data = {
-                    "connection": connection,
-                    "user_id": user_id,
-                    "access_token": identity.get("access_token"),
-                    "provider": identity.get("provider"),
-                    "vault_retrieved": True,
-                }
-                return token_data
-
+    if response.status_code == 404:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Token Vault: no stored token for connection '{connection}'. "
-                   "User must link their account first.",
+            detail=(
+                "Token Vault: no stored GitHub token for this user. "
+                "User must log in with GitHub via Auth0 to enable vault access."
+            ),
         )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Token Vault retrieval failed: {response.text}",
+        )
+
+    user_data = response.json()
+    identities = user_data.get("identities", [])
+
+    for identity in identities:
+        if identity.get("provider") == "github":
+            github_token = identity.get("access_token")
+            if not github_token:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=(
+                        "Token Vault: GitHub identity found but no access_token stored. "
+                        "Ensure 'store tokens' is enabled on the GitHub social connection."
+                    ),
+                )
+            return github_token
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=(
+            "Token Vault: no GitHub identity linked to this account. "
+            "User must log in with GitHub to store credentials in the vault."
+        ),
+    )
 
 
 async def list_vault_connections(user_id: str) -> list:
     """
     List all third-party connections stored in the vault for a user.
-    Used by the frontend to show which services the agent can access.
+    Shown in the Token Vault tab of the UI.
     """
-    mgmt_token = await get_management_token()
+    try:
+        mgmt_token = await _get_management_token()
+    except Exception:
+        return []
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"https://{AUTH0_DOMAIN}/api/v2/users/{user_id}/identities",
+            f"https://{AUTH0_DOMAIN}/api/v2/users/{user_id}",
             headers={"Authorization": f"Bearer {mgmt_token}"},
+            timeout=10.0,
         )
-        if response.status_code != 200:
-            return []
 
-        identities = response.json()
-        return [
-            {
-                "connection": i.get("provider"),
-                "has_token": "access_token" in i,
-            }
-            for i in identities
-            if i.get("provider") != "auth0"
-        ]
+    if response.status_code != 200:
+        return []
+
+    user_data = response.json()
+    identities = user_data.get("identities", [])
+
+    return [
+        {
+            "connection": i.get("provider"),
+            "has_token": "access_token" in i,
+            "user_id": i.get("user_id"),
+        }
+        for i in identities
+        if i.get("provider") != "auth0"
+    ]

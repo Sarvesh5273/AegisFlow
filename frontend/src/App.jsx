@@ -2,375 +2,375 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
 import { aegisApi } from './api'
 
-const RISK_COLORS = {
-  low: { bg: '#064e3b', border: '#10b981', badge: '#10b981' },
-  medium: { bg: '#451a03', border: '#f59e0b', badge: '#f59e0b' },
-  high: { bg: '#450a0a', border: '#ef4444', badge: '#ef4444' },
+const RISK = {
+  low:    { bg: '#052e16', border: '#16a34a', badge: '#16a34a', text: '#bbf7d0' },
+  medium: { bg: '#431407', border: '#ea580c', badge: '#ea580c', text: '#fed7aa' },
+  high:   { bg: '#450a0a', border: '#dc2626', badge: '#dc2626', text: '#fecaca' },
 }
 
+const TABS = [
+  { id: 'agent',    label: '⚡ Agent' },
+  { id: 'audit',    label: '📋 Audit Log' },
+  { id: 'policies', label: '🛡️ Policies' },
+  { id: 'vault',    label: '🔐 Token Vault' },
+]
+
 export default function App() {
-  const {
-    loginWithRedirect,
-    logout,
-    isAuthenticated,
-    user,
-    getAccessTokenSilently,
-    getAccessTokenWithPopup,
-    isLoading,
-    error,
-  } = useAuth0()
+  const { loginWithRedirect, logout, isAuthenticated, user,
+          getAccessTokenSilently, getAccessTokenWithPopup, isLoading, error } = useAuth0()
 
-  const [activeTab, setActiveTab] = useState('agent')
-  const [prompt, setPrompt] = useState('')
-  const [planResult, setPlanResult] = useState(null)
-  const [chatLoading, setChatLoading] = useState(false)
-  const [executing, setExecuting] = useState(false)
-  const [execResult, setExecResult] = useState(null)
+  const [tab, setTab]           = useState('agent')
+  const [prompt, setPrompt]     = useState('')
+  const [planResult, setPlan]   = useState(null)
+  const [execResult, setExec]   = useState(null)
+  const [chatBusy, setChatBusy] = useState(false)
+  const [execBusy, setExecBusy] = useState(false)
 
-  const [auditLogs, setAuditLogs] = useState([])
-  const [cloudState, setCloudState] = useState([])
-  const [consents, setConsents] = useState([])
-  const [policies, setPolicies] = useState([])
-  const [vaultConnections, setVaultConnections] = useState([])
-  const [auditLoading, setAuditLoading] = useState(false)
+  const [logs, setLogs]           = useState([])
+  const [ghState, setGhState]     = useState([])
+  const [consents, setConsents]   = useState([])
+  const [policies, setPolicies]   = useState([])
+  const [vaultConns, setVault]    = useState([])
+  const [auditBusy, setAuditBusy] = useState(false)
 
-  const getToken = useCallback(async () => {
-    try {
-      return await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-          scope: 'execute:high_risk',
-        },
-      })
-    } catch {
-      return await getAccessTokenWithPopup({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-          scope: 'execute:high_risk',
-        },
-      })
-    }
+  const [editingPolicy, setEditingPolicy] = useState(null)
+  const [saveMsg, setSaveMsg]             = useState('')
+
+  const getToken = useCallback(async (popup = false) => {
+    const params = { authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE, scope: 'execute:high_risk' } }
+    return popup
+      ? getAccessTokenWithPopup(params)
+      : getAccessTokenSilently(params).catch(() => getAccessTokenWithPopup(params))
   }, [getAccessTokenSilently, getAccessTokenWithPopup])
 
-  const loadAuditData = useCallback(async () => {
-    if (!isAuthenticated) return
-    setAuditLoading(true)
-    try {
-      const token = await getToken()
-      const [logs, state, consentData, vaultData] = await Promise.all([
-        aegisApi.getAuditLogs(token),
-        aegisApi.getCloudState(token),
-        aegisApi.getConsentRecords(token),
-        aegisApi.getVaultConnections(token),
-      ])
-      setAuditLogs(logs)
-      setCloudState(state)
-      setConsents(consentData)
-      setVaultConnections(vaultData.connections || [])
-    } catch (e) {
-      console.error('Audit load error:', e)
-    } finally {
-      setAuditLoading(false)
-    }
-  }, [isAuthenticated, getToken])
-
+  // Load policies (public)
   useEffect(() => {
     aegisApi.getPolicies().then(setPolicies).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    if (isAuthenticated && activeTab === 'audit') {
-      loadAuditData()
-    }
-  }, [isAuthenticated, activeTab, loadAuditData])
-
-  const handleChat = async () => {
-    if (!prompt.trim()) return
-    setChatLoading(true)
-    setExecResult(null)
-    setPlanResult(null)
-    try {
-      const data = await aegisApi.getChatPlan(prompt)
-      setPlanResult(data)
-    } catch {
-      alert('Backend error. Is the FastAPI server running?')
-    } finally {
-      setChatLoading(false)
-    }
-  }
-
-  const handleExecute = async () => {
-    if (!planResult) return
-    setExecuting(true)
-    try {
-      const token = await getAccessTokenWithPopup({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-          scope: 'execute:high_risk',
-        },
-      })
-      const primaryAction = planResult.plan.actions[0]
-      const result = await aegisApi.executeAction(primaryAction, token)
-      setExecResult(result)
-      setPlanResult(null)
-      setPrompt('')
-    } catch (err) {
-      const detail = err.response?.data?.detail || 'Authentication failed or access denied.'
-      alert(`Execution denied: ${detail}`)
-    } finally {
-      setExecuting(false)
-    }
-  }
-
-  const handleAutoApprove = async () => {
-    if (!planResult) return
-    setExecuting(true)
+  // Load audit data when tab opens
+  const loadAudit = useCallback(async () => {
+    if (!isAuthenticated) return
+    setAuditBusy(true)
     try {
       const token = await getToken()
-      const primaryAction = planResult.plan.actions[0]
-      const result = await aegisApi.executeAction(primaryAction, token)
-      setExecResult(result)
-      setPlanResult(null)
-      setPrompt('')
+      const [l, g, c, v] = await Promise.all([
+        aegisApi.getAuditLogs(token),
+        aegisApi.getGithubState(token),
+        aegisApi.getConsentRecords(token),
+        aegisApi.getVaultConnections(token),
+      ])
+      setLogs(l); setGhState(g); setConsents(c)
+      setVault(v.connections || [])
+    } catch (e) { console.error(e) }
+    finally { setAuditBusy(false) }
+  }, [isAuthenticated, getToken])
+
+  useEffect(() => {
+    if (isAuthenticated && (tab === 'audit' || tab === 'vault')) loadAudit()
+  }, [isAuthenticated, tab, loadAudit])
+
+  // ── Chat ──
+  const handleChat = async () => {
+    if (!prompt.trim()) return
+    setChatBusy(true); setPlan(null); setExec(null)
+    try {
+      const data = await aegisApi.getChatPlan(prompt)
+      setPlan(data)
+    } catch { alert('Backend error — is uvicorn running?') }
+    finally { setChatBusy(false) }
+  }
+
+  // ── Execute (step-up) ──
+  const handleExecute = async () => {
+    setExecBusy(true)
+    try {
+      const token = await getToken(true)            // force popup = explicit consent
+      const action = planResult.plan.actions[0]
+      const result = await aegisApi.executeAction(action, token)
+      setExec(result); setPlan(null); setPrompt('')
     } catch (err) {
-      alert(`Error: ${err.response?.data?.detail || err.message}`)
-    } finally {
-      setExecuting(false)
+      alert('Denied: ' + (err.response?.data?.detail || err.message))
+    } finally { setExecBusy(false) }
+  }
+
+  // ── Auto-approve (low risk) ──
+  const handleAutoExec = async () => {
+    setExecBusy(true)
+    try {
+      const token = await getToken()
+      const action = planResult.plan.actions[0]
+      const result = await aegisApi.executeAction(action, token)
+      setExec(result); setPlan(null); setPrompt('')
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message))
+    } finally { setExecBusy(false) }
+  }
+
+  // ── Policy editor ──
+  const handleSavePolicy = async () => {
+    if (!editingPolicy) return
+    setSaveMsg('')
+    try {
+      const token = await getToken()
+      await aegisApi.updatePolicy(editingPolicy, token)
+      const updated = await aegisApi.getPolicies()
+      setPolicies(updated)
+      setSaveMsg('✓ Policy saved')
+      setEditingPolicy(null)
+    } catch (err) {
+      setSaveMsg('Error: ' + (err.response?.data?.detail || err.message))
     }
   }
 
-  if (isLoading) {
-    return (
-      <div style={s.container}>
-        <p style={{ color: '#94a3b8' }}>Connecting to AegisFlow Vault...</p>
-      </div>
-    )
+  const handleResetPolicies = async () => {
+    try {
+      const token = await getToken()
+      await aegisApi.resetPolicies(token)
+      const updated = await aegisApi.getPolicies()
+      setPolicies(updated)
+      setSaveMsg('✓ Policies reset to defaults')
+    } catch (err) {
+      setSaveMsg('Error: ' + (err.response?.data?.detail || err.message))
+    }
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div style={{ ...s.container, justifyContent: 'center', alignItems: 'center', display: 'flex', flexDirection: 'column' }}>
-        <div style={s.logoWrap}>
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <path d="M24 4L44 14V26C44 35.9 35.1 44.4 24 47C12.9 44.4 4 35.9 4 26V14L24 4Z" fill="#1e293b" stroke="#38bdf8" strokeWidth="2"/>
-            <path d="M24 14L32 18V24C32 28.4 28.4 32.2 24 33C19.6 32.2 16 28.4 16 24V18L24 14Z" fill="#38bdf8" opacity="0.3"/>
-            <path d="M20 24L23 27L28 21" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h1 style={s.title}>AegisFlow</h1>
-        <p style={{ color: '#64748b', marginBottom: '2rem', fontSize: '1rem' }}>
-          Policy-Enforced Consent for Autonomous AI Agents
-        </p>
-        {error && (
-          <div style={s.errorBox}>
-            <strong>Auth Error:</strong> {error.message}
-          </div>
-        )}
-        <button onClick={() => loginWithRedirect()} style={s.primaryBtn}>
-          Initialize System
-        </button>
-      </div>
-    )
-  }
+  // ── Loading / not authed ──
+  if (isLoading) return <div style={s.splash}><p style={{color:'#64748b'}}>Connecting to AegisFlow…</p></div>
+
+  if (!isAuthenticated) return (
+    <div style={s.splash}>
+      <Shield size={56} />
+      <h1 style={s.bigTitle}>AegisFlow</h1>
+      <p style={{color:'#64748b',marginBottom:'2rem',maxWidth:360,textAlign:'center'}}>
+        Policy-Enforced Consent for AI Agents.<br/>
+        Powered by Auth0 Token Vault.
+      </p>
+      {error && <div style={s.errBox}>{error.message}</div>}
+      <button onClick={() => loginWithRedirect()} style={s.btn.primary}>
+        Initialize System
+      </button>
+    </div>
+  )
 
   const decision = planResult?.decision
-  const riskColors = decision ? RISK_COLORS[decision.risk_level] || RISK_COLORS.high : null
+  const rc = decision ? (RISK[decision.risk_level] || RISK.high) : null
 
   return (
-    <div style={s.appWrap}>
+    <div style={s.layout}>
+
       {/* Sidebar */}
       <aside style={s.sidebar}>
-        <div style={s.logoWrap}>
-          <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
-            <path d="M24 4L44 14V26C44 35.9 35.1 44.4 24 47C12.9 44.4 4 35.9 4 26V14L24 4Z" fill="#1e293b" stroke="#38bdf8" strokeWidth="2"/>
-            <path d="M20 24L23 27L28 21" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '1.1rem' }}>AegisFlow</span>
-        </div>
-
+        <div style={s.logo}><Shield size={24}/><span style={{color:'#38bdf8',fontWeight:700}}>AegisFlow</span></div>
         <nav style={s.nav}>
-          {[
-            { id: 'agent', label: 'Agent Console' },
-            { id: 'audit', label: 'Audit Log' },
-            { id: 'policies', label: 'Policy Registry' },
-            { id: 'vault', label: 'Token Vault' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{ ...s.navBtn, ...(activeTab === tab.id ? s.navBtnActive : {}) }}
-            >
-              {tab.label}
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{...s.navBtn, ...(tab===t.id ? s.navActive : {})}}>
+              {t.label}
             </button>
           ))}
         </nav>
-
         <div style={s.userChip}>
           <div style={s.avatar}>{user.email?.[0]?.toUpperCase()}</div>
-          <span style={{ color: '#94a3b8', fontSize: '0.75rem', wordBreak: 'break-all' }}>{user.email}</span>
-          <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} style={s.logoutBtn}>
-            ×
-          </button>
+          <span style={{color:'#64748b',fontSize:'0.72rem',wordBreak:'break-all',flex:1}}>{user.email}</span>
+          <button onClick={() => logout({logoutParams:{returnTo:window.location.origin}})} style={s.xBtn}>✕</button>
         </div>
       </aside>
 
       {/* Main */}
       <main style={s.main}>
 
-        {/* === AGENT CONSOLE === */}
-        {activeTab === 'agent' && (
+        {/* ══ AGENT ══ */}
+        {tab === 'agent' && (
           <div>
-            <h2 style={s.pageTitle}>Agent Console</h2>
-            <p style={s.pageSub}>Type a command. The policy engine intercepts high-risk actions before execution.</p>
+            <PageHeader title="Agent Console"
+              sub="Type a command. AegisFlow intercepts high-risk actions before execution." />
 
             <div style={s.inputRow}>
-              <input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleChat()}
-                placeholder="e.g. 'Read system logs' or 'Provision a GPU instance'"
-                style={s.input}
-                disabled={chatLoading}
-              />
-              <button onClick={handleChat} disabled={chatLoading || !prompt.trim()} style={s.primaryBtn}>
-                {chatLoading ? 'Analyzing…' : 'Send'}
+              <input value={prompt} onChange={e=>setPrompt(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&handleChat()}
+                placeholder="e.g. 'Show my repos' or 'Delete the repo myuser/test-repo'"
+                style={s.input} disabled={chatBusy} />
+              <button onClick={handleChat} disabled={chatBusy||!prompt.trim()} style={s.btn.primary}>
+                {chatBusy ? 'Analyzing…' : 'Send'}
               </button>
             </div>
 
+            {/* Plan card */}
             {planResult && !execResult && (
-              <div style={s.card}>
-                <div style={s.cardHeader}>
-                  <span style={s.label}>Proposed Action Plan</span>
-                  <span style={{
-                    ...s.badge,
-                    backgroundColor: riskColors?.badge,
-                    color: '#0f172a',
-                  }}>
-                    {decision?.risk_level?.toUpperCase()} RISK
-                  </span>
+              <div style={{...s.card, border:`1px solid ${rc.border}`}}>
+                <div style={s.cardRow}>
+                  <span style={s.label}>Action Plan</span>
+                  <RiskBadge level={decision.risk_level} />
                 </div>
                 <pre style={s.code}>{JSON.stringify(planResult.plan.actions, null, 2)}</pre>
-
-                <div style={{ ...s.decisionBox, backgroundColor: riskColors?.bg, border: `1px solid ${riskColors?.border}` }}>
+                <div style={{...s.decisionBox, background:rc.bg, border:`1px solid ${rc.border}`}}>
                   <div>
-                    <strong style={{ color: riskColors?.border }}>Policy Decision</strong>
-                    <p style={{ margin: '0.25rem 0 0', color: '#cbd5e1', fontSize: '0.9rem' }}>{decision?.reason}</p>
+                    <div style={{color:rc.text,fontWeight:600,marginBottom:'0.25rem'}}>
+                      {decision.requires_auth ? '🔐 Step-up Auth Required' : '✓ Auto-Approved'}
+                    </div>
+                    <div style={{color:'#94a3b8',fontSize:'0.85rem'}}>{decision.reason}</div>
                   </div>
-                  {decision?.requires_auth ? (
-                    <button onClick={handleExecute} disabled={executing} style={{ ...s.primaryBtn, backgroundColor: riskColors?.border }}>
-                      {executing ? 'Processing…' : '🔐 Authorize & Execute'}
-                    </button>
-                  ) : (
-                    <button onClick={handleAutoApprove} disabled={executing} style={{ ...s.primaryBtn, backgroundColor: '#10b981' }}>
-                      {executing ? 'Processing…' : '✓ Execute (Auto-Approved)'}
-                    </button>
-                  )}
+                  {decision.requires_auth
+                    ? <button onClick={handleExecute} disabled={execBusy}
+                        style={{...s.btn.primary, background:rc.badge, color:'#000'}}>
+                        {execBusy ? 'Processing…' : '🔐 Authorize & Execute'}
+                      </button>
+                    : <button onClick={handleAutoExec} disabled={execBusy}
+                        style={{...s.btn.primary, background:'#16a34a'}}>
+                        {execBusy ? 'Processing…' : '✓ Execute'}
+                      </button>
+                  }
                 </div>
               </div>
             )}
 
+            {/* Execution result */}
             {execResult && (
-              <div style={{ ...s.card, border: '1px solid #10b981' }}>
-                <div style={s.cardHeader}>
-                  <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Execution Complete</span>
-                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{execResult.executed_at}</span>
+              <div style={{...s.card, border:'1px solid #16a34a'}}>
+                <div style={s.cardRow}>
+                  <span style={{color:'#16a34a',fontWeight:600}}>✓ Execution Complete</span>
+                  {execResult.vault_used && <span style={s.vaultTag}>🔐 Token Vault Used</span>}
                 </div>
-                <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>{execResult.message}</p>
-                <div style={s.label}>Side Effects (written to audit)</div>
+                <p style={{color:'#cbd5e1',margin:'0 0 1rem'}}>{execResult.message}</p>
+                <div style={s.label}>Side Effects (written to audit log)</div>
                 <pre style={s.code}>{JSON.stringify(execResult.side_effects, null, 2)}</pre>
-                <button onClick={() => setExecResult(null)} style={{ ...s.secondaryBtn, marginTop: '1rem' }}>
-                  Clear
-                </button>
+                <button onClick={()=>setExec(null)} style={{...s.btn.ghost,marginTop:'0.75rem'}}>Clear</button>
+              </div>
+            )}
+
+            {/* Sample commands */}
+            {!planResult && !execResult && (
+              <div style={{marginTop:'1.5rem'}}>
+                <div style={s.label}>Try these commands</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',marginTop:'0.5rem'}}>
+                  {[
+                    'Show my GitHub repositories',
+                    'Create an issue in myuser/my-repo titled "Bug: login fails"',
+                    'Create a new private repo called aegisflow-test',
+                    'Delete the repository myuser/test-repo',
+                  ].map(cmd => (
+                    <button key={cmd} onClick={()=>{setPrompt(cmd)}}
+                      style={s.chip}>{cmd}</button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* === AUDIT LOG === */}
-        {activeTab === 'audit' && (
+        {/* ══ AUDIT LOG ══ */}
+        {tab === 'audit' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={s.pageTitle}>Audit Log</h2>
-              <button onClick={loadAuditData} style={s.secondaryBtn} disabled={auditLoading}>
-                {auditLoading ? 'Loading…' : '↻ Refresh'}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <PageHeader title="Audit Log" sub="Every action, consent, and GitHub operation is recorded." />
+              <button onClick={loadAudit} style={s.btn.ghost} disabled={auditBusy}>
+                {auditBusy ? 'Loading…' : '↻ Refresh'}
               </button>
             </div>
 
-            <div style={s.gridTwo}>
+            <div style={s.grid2}>
+              {/* Action logs */}
               <div>
                 <div style={s.label}>Action History</div>
-                {auditLogs.length === 0 ? (
-                  <p style={{ color: '#475569' }}>No actions logged yet.</p>
-                ) : (
-                  auditLogs.map((log) => (
-                    <div key={log.id} style={{ ...s.logRow, borderLeft: `3px solid ${log.status === 'success' ? '#10b981' : '#ef4444'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>{log.action_type}</span>
-                        <span style={{ color: log.status === 'success' ? '#10b981' : '#ef4444', fontSize: '0.75rem' }}>
-                          {log.status.toUpperCase()}
-                        </span>
+                {logs.length === 0
+                  ? <Empty text="No actions yet. Run a command." />
+                  : logs.map(l => (
+                    <div key={l.id} style={{...s.logRow, borderLeft:`3px solid ${l.status==='success'?'#16a34a':'#dc2626'}`}}>
+                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.15rem'}}>
+                        <span style={{color:'#e2e8f0',fontWeight:600,fontSize:'0.82rem'}}>{l.action_type}</span>
+                        <span style={{fontSize:'0.72rem',color:l.status==='success'?'#16a34a':'#dc2626'}}>{l.status.toUpperCase()}</span>
                       </div>
-                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{log.resource} · {log.risk_level} risk</div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.2rem' }}>{log.executed_at}</div>
+                      <div style={{color:'#64748b',fontSize:'0.75rem'}}>{l.resource}</div>
+                      <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.15rem'}}>
+                        <span style={{color:'#475569',fontSize:'0.7rem'}}>{l.risk_level} risk</span>
+                        {l.vault_used===1 && <span style={s.vaultTag}>Vault</span>}
+                      </div>
+                      <div style={{color:'#334155',fontSize:'0.68rem',marginTop:'0.15rem'}}>{l.executed_at}</div>
                     </div>
-                  ))
-                )}
+                  ))}
               </div>
 
               <div>
-                <div style={s.label}>Cloud Resources</div>
-                {cloudState.length === 0 ? (
-                  <p style={{ color: '#475569' }}>No resources provisioned yet.</p>
-                ) : (
-                  cloudState.map((r) => (
-                    <div key={r.id} style={{ ...s.logRow, borderLeft: `3px solid ${r.status === 'running' || r.status === 'online' ? '#10b981' : '#ef4444'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>{r.resource_type}</span>
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{r.status}</span>
-                      </div>
-                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{r.resource_id}</div>
+                {/* Consent records */}
+                <div style={s.label}>Consent Records</div>
+                {consents.length === 0
+                  ? <Empty text="No consents yet." />
+                  : consents.map(c => (
+                    <div key={c.id} style={{...s.logRow, borderLeft:'3px solid #38bdf8'}}>
+                      <span style={{color:'#e2e8f0',fontWeight:600,fontSize:'0.82rem'}}>{c.action_type}</span>
+                      <div style={{color:'#64748b',fontSize:'0.75rem'}}>Scope: {c.scope_granted}</div>
+                      <div style={{color:'#475569',fontSize:'0.68rem'}}>{c.granted_at}</div>
                     </div>
-                  ))
-                )}
+                  ))}
 
-                <div style={{ ...s.label, marginTop: '1.5rem' }}>Consent Records</div>
-                {consents.length === 0 ? (
-                  <p style={{ color: '#475569' }}>No consents recorded yet.</p>
-                ) : (
-                  consents.map((c) => (
-                    <div key={c.id} style={{ ...s.logRow, borderLeft: '3px solid #38bdf8' }}>
-                      <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>{c.action_type}</div>
-                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Scope: {c.scope_granted} · User: {c.user_id?.slice(0, 20)}…</div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem' }}>{c.granted_at}</div>
+                {/* GitHub state */}
+                <div style={{...s.label,marginTop:'1.25rem'}}>GitHub Operations</div>
+                {ghState.length === 0
+                  ? <Empty text="No GitHub operations yet." />
+                  : ghState.map(g => (
+                    <div key={g.id} style={{...s.logRow, borderLeft:'3px solid #a78bfa'}}>
+                      <span style={{color:'#e2e8f0',fontWeight:600,fontSize:'0.82rem'}}>{g.action}</span>
+                      <div style={{color:'#64748b',fontSize:'0.75rem'}}>{g.repo}</div>
+                      <div style={{color:'#475569',fontSize:'0.68rem'}}>{g.created_at}</div>
                     </div>
-                  ))
-                )}
+                  ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* === POLICY REGISTRY === */}
-        {activeTab === 'policies' && (
+        {/* ══ POLICIES ══ */}
+        {tab === 'policies' && (
           <div>
-            <h2 style={s.pageTitle}>Policy Registry</h2>
-            <p style={s.pageSub}>All registered policies. These determine when the agent requires user consent.</p>
-            <div style={s.gridTwo}>
-              {policies.map((p) => {
-                const rc = RISK_COLORS[p.risk_level] || RISK_COLORS.high
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <PageHeader title="Policy Registry"
+                sub="Runtime-editable policies. Change risk levels and consent requirements live." />
+              <button onClick={handleResetPolicies} style={s.btn.ghost}>↺ Reset Defaults</button>
+            </div>
+            {saveMsg && <div style={{...s.infoBox,marginBottom:'1rem'}}>{saveMsg}</div>}
+
+            <div style={s.grid2}>
+              {policies.map(p => {
+                const rc2 = RISK[p.risk_level] || RISK.high
+                const editing = editingPolicy?.action_type === p.action_type
                 return (
-                  <div key={p.action_type} style={{ ...s.card, border: `1px solid ${rc.border}` }}>
-                    <div style={s.cardHeader}>
-                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{p.action_type}</span>
-                      <span style={{ ...s.badge, backgroundColor: rc.badge, color: '#0f172a' }}>
-                        {p.risk_level.toUpperCase()}
-                      </span>
+                  <div key={p.action_type} style={{...s.card, border:`1px solid ${rc2.border}`}}>
+                    <div style={s.cardRow}>
+                      <span style={{color:'#e2e8f0',fontWeight:600,fontSize:'0.9rem'}}>{p.action_type}</span>
+                      <RiskBadge level={p.risk_level} />
                     </div>
-                    <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.5rem 0' }}>{p.description}</p>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={s.chip}>{p.requires_step_up ? '🔐 Step-up required' : '✓ Auto-approve'}</span>
-                      {p.max_cost && <span style={s.chip}>Max cost: ${p.max_cost}</span>}
-                    </div>
+                    <p style={{color:'#64748b',fontSize:'0.82rem',margin:'0.4rem 0 0.75rem'}}>{p.description}</p>
+
+                    {!editing ? (
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'0.78rem',color:'#94a3b8'}}>
+                          {p.requires_step_up ? '🔐 Step-up required' : '✓ Auto-approve'}
+                        </span>
+                        <button onClick={()=>setEditingPolicy({...p})} style={s.btn.ghost}>Edit</button>
+                      </div>
+                    ) : (
+                      <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+                        <label style={s.formLabel}>Risk Level
+                          <select value={editingPolicy.risk_level}
+                            onChange={e=>setEditingPolicy({...editingPolicy,risk_level:e.target.value})}
+                            style={s.select}>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+                        </label>
+                        <label style={{...s.formLabel,flexDirection:'row',alignItems:'center',gap:'0.5rem'}}>
+                          <input type="checkbox" checked={editingPolicy.requires_step_up}
+                            onChange={e=>setEditingPolicy({...editingPolicy,requires_step_up:e.target.checked})} />
+                          Requires step-up auth
+                        </label>
+                        <div style={{display:'flex',gap:'0.5rem',marginTop:'0.25rem'}}>
+                          <button onClick={handleSavePolicy} style={s.btn.primary}>Save</button>
+                          <button onClick={()=>setEditingPolicy(null)} style={s.btn.ghost}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -378,51 +378,62 @@ export default function App() {
           </div>
         )}
 
-        {/* === TOKEN VAULT === */}
-        {activeTab === 'vault' && (
+        {/* ══ TOKEN VAULT ══ */}
+        {tab === 'vault' && (
           <div>
-            <h2 style={s.pageTitle}>Auth0 Token Vault</h2>
-            <p style={s.pageSub}>
-              Token Vault stores third-party OAuth credentials on behalf of the user.
-              The agent retrieves these to call external APIs without ever seeing raw credentials.
-            </p>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <PageHeader title="Auth0 Token Vault"
+                sub="Stored third-party credentials. The agent retrieves these to call APIs without seeing your password." />
+              <button onClick={loadAudit} style={s.btn.ghost} disabled={auditBusy}>
+                {auditBusy ? 'Loading…' : '↻ Refresh'}
+              </button>
+            </div>
 
+            {/* How it works */}
             <div style={s.card}>
-              <div style={s.label}>How it works</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
+              <div style={s.label}>How Token Vault Works</div>
+              <div style={{display:'flex',flexDirection:'column',gap:'0.6rem',marginTop:'0.75rem'}}>
                 {[
-                  { step: '1', text: 'User links a third-party service (e.g. GitHub) via Auth0.' },
-                  { step: '2', text: 'Auth0 stores the OAuth token in the Token Vault, scoped to this user.' },
-                  { step: '3', text: 'When the agent needs to act, it calls /vault/token/{connection} with the user\'s JWT.' },
-                  { step: '4', text: 'AegisFlow retrieves the vault token and calls the external API on behalf of the user.' },
-                  { step: '5', text: 'The raw credential is never exposed to the agent or the frontend.' },
-                ].map((item) => (
-                  <div key={item.step} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <span style={{ ...s.badge, backgroundColor: '#38bdf8', color: '#0f172a', flexShrink: 0 }}>{item.step}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>{item.text}</span>
+                  ['1', 'You log in with GitHub via Auth0 (social connection).'],
+                  ['2', 'Auth0 stores your GitHub OAuth token in the Token Vault — encrypted, scoped to you.'],
+                  ['3', 'When the agent needs to call GitHub, it sends your Auth0 JWT to AegisFlow.'],
+                  ['4', 'AegisFlow calls the Auth0 Management API (M2M) to retrieve the vault token.'],
+                  ['5', 'The GitHub API is called. Your raw credential never left Auth0.'],
+                ].map(([n, t]) => (
+                  <div key={n} style={{display:'flex',gap:'0.75rem',alignItems:'flex-start'}}>
+                    <span style={{...s.badge,background:'#38bdf8',color:'#0f172a',flexShrink:0}}>{n}</span>
+                    <span style={{color:'#94a3b8',fontSize:'0.88rem'}}>{t}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div style={{ ...s.card, marginTop: '1rem' }}>
-              <div style={s.cardHeader}>
-                <span style={s.label}>Linked Connections</span>
-                <button onClick={loadAuditData} style={s.secondaryBtn} disabled={auditLoading}>
-                  {auditLoading ? 'Loading…' : '↻ Refresh'}
-                </button>
+            {/* Linked connections */}
+            <div style={{...s.card,marginTop:'1rem'}}>
+              <div style={s.cardRow}>
+                <div style={s.label}>Linked Connections</div>
               </div>
-              {vaultConnections.length === 0 ? (
-                <p style={{ color: '#475569', marginTop: '0.75rem' }}>
-                  No third-party connections found. Link a social account (GitHub, Google) in your Auth0 profile to enable Token Vault.
-                </p>
+              {vaultConns.length === 0 ? (
+                <div style={{color:'#475569',fontSize:'0.88rem',marginTop:'0.75rem'}}>
+                  <p>No third-party connections found.</p>
+                  <p style={{marginTop:'0.5rem'}}>To enable Token Vault:</p>
+                  <ol style={{color:'#64748b',paddingLeft:'1.25rem',lineHeight:1.8}}>
+                    <li>Go to Auth0 Dashboard → Authentication → Social</li>
+                    <li>Enable GitHub connection</li>
+                    <li>Turn on <strong style={{color:'#e2e8f0'}}>"Store tokens"</strong> in the connection settings</li>
+                    <li>Log out and log back in using the GitHub button</li>
+                  </ol>
+                </div>
               ) : (
-                vaultConnections.map((c) => (
-                  <div key={c.connection} style={{ ...s.logRow, borderLeft: `3px solid ${c.has_token ? '#10b981' : '#64748b'}` }}>
-                    <span style={{ color: '#e2e8f0' }}>{c.connection}</span>
-                    <span style={{ color: c.has_token ? '#10b981' : '#64748b', fontSize: '0.8rem' }}>
-                      {c.has_token ? '✓ Token stored in vault' : 'No token'}
-                    </span>
+                vaultConns.map(c => (
+                  <div key={c.connection} style={{...s.logRow, borderLeft:`3px solid ${c.has_token?'#16a34a':'#475569'}`, marginTop:'0.5rem'}}>
+                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                      <span style={{color:'#e2e8f0',fontWeight:600}}>{c.connection}</span>
+                      <span style={{color:c.has_token?'#16a34a':'#64748b',fontSize:'0.8rem'}}>
+                        {c.has_token ? '✓ Token stored in vault' : 'No token stored'}
+                      </span>
+                    </div>
+                    {c.user_id && <div style={{color:'#475569',fontSize:'0.72rem',marginTop:'0.2rem'}}>{c.user_id}</div>}
                   </div>
                 ))
               )}
@@ -435,34 +446,68 @@ export default function App() {
   )
 }
 
-// --- STYLES ---
+// ── Small components ──
+function Shield({ size = 32 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M24 4L44 14V26C44 35.9 35.1 44.4 24 47C12.9 44.4 4 35.9 4 26V14L24 4Z"
+        fill="#1e293b" stroke="#38bdf8" strokeWidth="2"/>
+      <path d="M20 24L23 27L28 21" stroke="#38bdf8" strokeWidth="2.5"
+        strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function RiskBadge({ level }) {
+  const rc = RISK[level] || RISK.high
+  return <span style={{...s.badge, background:rc.badge, color:'#000'}}>{level.toUpperCase()}</span>
+}
+
+function PageHeader({ title, sub }) {
+  return (
+    <div style={{marginBottom:'1.5rem'}}>
+      <h2 style={{color:'#f1f5f9',fontWeight:700,margin:'0 0 0.25rem',fontSize:'1.4rem'}}>{title}</h2>
+      <p style={{color:'#64748b',fontSize:'0.88rem',margin:0}}>{sub}</p>
+    </div>
+  )
+}
+
+function Empty({ text }) {
+  return <p style={{color:'#334155',fontSize:'0.85rem',padding:'0.5rem 0'}}>{text}</p>
+}
+
+// ── Styles ──
 const s = {
-  container: { backgroundColor: '#0f172a', color: 'white', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, system-ui, sans-serif', padding: '2rem' },
-  appWrap: { display: 'flex', minHeight: '100vh', backgroundColor: '#0f172a', color: 'white', fontFamily: 'Inter, system-ui, sans-serif' },
-  sidebar: { width: '220px', flexShrink: 0, backgroundColor: '#0a1628', borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem', gap: '0.5rem' },
-  logoWrap: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem' },
-  nav: { display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 },
-  navBtn: { background: 'none', border: 'none', color: '#64748b', textAlign: 'left', padding: '0.6rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' },
-  navBtnActive: { backgroundColor: '#1e293b', color: '#e2e8f0' },
-  userChip: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 'auto', padding: '0.75rem', backgroundColor: '#1e293b', borderRadius: '8px' },
-  avatar: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#38bdf8', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem', flexShrink: 0 },
-  logoutBtn: { background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '1.2rem', marginLeft: 'auto', flexShrink: 0 },
-  main: { flex: 1, padding: '2.5rem', overflowY: 'auto', maxWidth: '900px' },
-  pageTitle: { fontSize: '1.5rem', fontWeight: 700, color: '#f1f5f9', margin: '0 0 0.25rem' },
-  pageSub: { color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem' },
-  title: { fontSize: '3rem', fontWeight: 800, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '1rem 0 0.5rem' },
-  inputRow: { display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' },
-  input: { flex: 1, padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #1e293b', backgroundColor: '#1e293b', color: '#f1f5f9', fontSize: '0.95rem', outline: 'none' },
-  card: { backgroundColor: '#1e293b', borderRadius: '12px', padding: '1.25rem', marginBottom: '1rem', border: '1px solid #334155' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' },
-  label: { color: '#64748b', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' },
-  badge: { padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700 },
-  chip: { backgroundColor: '#0f172a', color: '#94a3b8', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid #334155' },
-  code: { backgroundColor: '#0f172a', padding: '1rem', borderRadius: '8px', overflowX: 'auto', color: '#94a3b8', fontSize: '0.82rem', margin: '0 0 1rem' },
-  decisionBox: { padding: '1rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' },
-  primaryBtn: { backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', whiteSpace: 'nowrap' },
-  secondaryBtn: { backgroundColor: 'transparent', color: '#94a3b8', border: '1px solid #334155', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' },
-  errorBox: { backgroundColor: '#450a0a', color: '#fca5a5', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' },
-  gridTwo: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' },
-  logRow: { backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '6px', marginBottom: '0.5rem', paddingLeft: '0.75rem' },
+  splash:   { minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0f172a', color:'white', fontFamily:'Inter,system-ui,sans-serif', padding:'2rem' },
+  bigTitle: { fontSize:'3rem', fontWeight:800, background:'linear-gradient(to right,#38bdf8,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', margin:'1rem 0 0.5rem' },
+  layout:   { display:'flex', minHeight:'100vh', background:'#0f172a', color:'white', fontFamily:'Inter,system-ui,sans-serif' },
+  sidebar:  { width:210, flexShrink:0, background:'#080f1e', borderRight:'1px solid #1e293b', display:'flex', flexDirection:'column', padding:'1.25rem 0.75rem', gap:'0.25rem' },
+  logo:     { display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1.75rem', padding:'0 0.25rem' },
+  nav:      { display:'flex', flexDirection:'column', gap:'0.15rem', flex:1 },
+  navBtn:   { background:'none', border:'none', color:'#475569', textAlign:'left', padding:'0.55rem 0.75rem', borderRadius:'6px', cursor:'pointer', fontSize:'0.85rem' },
+  navActive:{ background:'#1e293b', color:'#e2e8f0' },
+  userChip: { display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.6rem', background:'#1e293b', borderRadius:'8px', marginTop:'auto' },
+  avatar:   { width:26, height:26, borderRadius:'50%', background:'#38bdf8', color:'#0f172a', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.75rem', flexShrink:0 },
+  xBtn:     { background:'none', border:'none', color:'#475569', cursor:'pointer', fontSize:'1rem', flexShrink:0 },
+  main:     { flex:1, padding:'2.5rem', overflowY:'auto', maxWidth:960 },
+  inputRow: { display:'flex', gap:'0.75rem', marginBottom:'1.25rem' },
+  input:    { flex:1, padding:'0.7rem 1rem', borderRadius:'8px', border:'1px solid #1e293b', background:'#1e293b', color:'#f1f5f9', fontSize:'0.95rem', outline:'none' },
+  card:     { background:'#1e293b', borderRadius:'12px', padding:'1.25rem', marginBottom:'1rem', border:'1px solid #334155' },
+  cardRow:  { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.75rem' },
+  decisionBox: { padding:'1rem', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'1rem', flexWrap:'wrap' },
+  code:     { background:'#0f172a', padding:'1rem', borderRadius:'8px', overflowX:'auto', color:'#94a3b8', fontSize:'0.8rem', margin:'0 0 1rem', fontFamily:'monospace' },
+  label:    { color:'#64748b', fontSize:'0.72rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' },
+  badge:    { padding:'0.2rem 0.55rem', borderRadius:'20px', fontSize:'0.68rem', fontWeight:700 },
+  vaultTag: { background:'#1e3a5f', color:'#38bdf8', padding:'0.15rem 0.5rem', borderRadius:'4px', fontSize:'0.68rem', fontWeight:600 },
+  chip:     { background:'#1e293b', border:'1px solid #334155', color:'#94a3b8', padding:'0.35rem 0.75rem', borderRadius:'20px', fontSize:'0.78rem', cursor:'pointer' },
+  grid2:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' },
+  logRow:   { background:'#0f172a', padding:'0.65rem 0.75rem', borderRadius:'6px', marginBottom:'0.4rem' },
+  infoBox:  { background:'#052e16', color:'#86efac', border:'1px solid #16a34a', padding:'0.6rem 1rem', borderRadius:'8px', fontSize:'0.85rem' },
+  errBox:   { background:'#450a0a', color:'#fca5a5', padding:'0.75rem 1rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.88rem' },
+  formLabel:{ display:'flex', flexDirection:'column', gap:'0.3rem', color:'#94a3b8', fontSize:'0.82rem' },
+  select:   { background:'#0f172a', border:'1px solid #334155', color:'#e2e8f0', padding:'0.4rem', borderRadius:'6px', marginTop:'0.2rem' },
+  btn: {
+    primary: { background:'#38bdf8', color:'#0f172a', border:'none', padding:'0.65rem 1.25rem', borderRadius:'8px', fontWeight:600, cursor:'pointer', fontSize:'0.9rem', whiteSpace:'nowrap' },
+    ghost:   { background:'transparent', color:'#94a3b8', border:'1px solid #334155', padding:'0.5rem 1rem', borderRadius:'8px', cursor:'pointer', fontSize:'0.82rem' },
+  },
 }

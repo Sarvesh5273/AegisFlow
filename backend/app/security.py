@@ -16,10 +16,6 @@ security = HTTPBearer()
 def verify_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> dict:
-    """
-    Verifies the Auth0 JWT against the tenant's public JWKS.
-    Returns the decoded token payload on success.
-    """
     token = credentials.credentials
     jwks_url = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
     jwks_client = jwt.PyJWKClient(jwks_url)
@@ -34,19 +30,9 @@ def verify_token(
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
         return payload
-
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired.",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired.")
     except jwt.PyJWKClientError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to fetch public keys from Auth0.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to fetch public keys.")
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")

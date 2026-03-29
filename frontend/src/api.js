@@ -1,54 +1,23 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000'
+const BASE = 'http://localhost:8000'
 
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
-})
+const open = axios.create({ baseURL: BASE, headers: { 'Content-Type': 'application/json' } })
 
-const authClient = (token) =>
+const auth = (token) =>
   axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    baseURL: BASE,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   })
 
 export const aegisApi = {
-  async getChatPlan(prompt) {
-    const res = await apiClient.post('/agent/chat', { prompt })
-    return res.data
-  },
-
-  async executeAction(action, token) {
-    const res = await authClient(token).post('/agent/execute', action)
-    return res.data
-  },
-
-  async getPolicies() {
-    const res = await apiClient.get('/policies')
-    return res.data
-  },
-
-  async getAuditLogs(token) {
-    const res = await authClient(token).get('/audit/logs')
-    return res.data
-  },
-
-  async getCloudState(token) {
-    const res = await authClient(token).get('/audit/state')
-    return res.data
-  },
-
-  async getConsentRecords(token) {
-    const res = await authClient(token).get('/audit/consents')
-    return res.data
-  },
-
-  async getVaultConnections(token) {
-    const res = await authClient(token).get('/vault/connections')
-    return res.data
-  },
+  getChatPlan: (prompt) => open.post('/agent/chat', { prompt }).then(r => r.data),
+  executeAction: (action, token) => auth(token).post('/agent/execute', action).then(r => r.data),
+  getPolicies: () => open.get('/policies').then(r => r.data),
+  updatePolicy: (policy, token) => auth(token).put('/policies/update', policy).then(r => r.data),
+  resetPolicies: (token) => auth(token).post('/policies/reset').then(r => r.data),
+  getAuditLogs: (token) => auth(token).get('/audit/logs').then(r => r.data),
+  getGithubState: (token) => auth(token).get('/audit/github').then(r => r.data),
+  getConsentRecords: (token) => auth(token).get('/audit/consents').then(r => r.data),
+  getVaultConnections: (token) => auth(token).get('/vault/connections').then(r => r.data),
 }

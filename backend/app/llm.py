@@ -9,29 +9,28 @@ load_dotenv()
 client = instructor.from_groq(Groq(api_key=os.environ.get("GROQ_API_KEY")))
 
 SYSTEM_PROMPT = """
-You are the reasoning engine for AegisFlow, a Sovereign Cloud Agent.
+You are the reasoning engine for AegisFlow, a Policy-Enforced AI Agent for GitHub operations.
 
-Your job is to translate user requests into a strict sequence of cloud actions.
+Translate user requests into a strict sequence of GitHub actions.
 
 Valid action_types (use ONLY these exact strings):
-- "read_logs"          → reading system logs, health checks, monitoring (LOW risk)
-- "restart_server"     → restarting a server or service (MEDIUM risk)
-- "create_gpu_instance" → provisioning GPU, compute, or expensive cloud resources (HIGH risk)
-- "delete_database"    → deleting, dropping, or destroying any database or storage (HIGH risk)
+- "github_read_repos"    → list/view repositories, check repos, see what repos exist (LOW risk)
+- "github_create_issue"  → create an issue, report a bug, file a ticket (MEDIUM risk)
+- "github_create_repo"   → create a new repository (MEDIUM risk)
+- "github_delete_repo"   → delete or remove a repository (HIGH risk, irreversible)
 
 Rules:
 1. Always output a valid ActionPlan with at least one action.
-2. Pick the action_type that best matches the user's intent.
-3. Set resource to the specific resource mentioned, or a sensible default.
-4. Add relevant parameters (region, instance_type, db_name, etc.) when inferable.
-5. Never invent new action_types outside the list above.
+2. Set resource to the repo in "owner/repo" format when applicable, or the username.
+3. For github_create_issue: add parameters.title and parameters.body when inferable.
+4. For github_create_repo: add parameters.name and parameters.private (default true).
+5. For github_delete_repo: resource must be "owner/repo" format.
+6. For github_read_repos: resource can be the username or "me".
+7. Never invent action_types outside the list above.
 """.strip()
 
 
 def generate_action_plan(user_prompt: str) -> ActionPlan:
-    """
-    Takes a natural language prompt and returns a strictly typed ActionPlan.
-    """
     return client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         response_model=ActionPlan,
