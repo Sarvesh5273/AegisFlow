@@ -134,7 +134,7 @@ function ExecutionOutput({ result }) {
         </div>
         <div style={{ color:'#94a3b8', fontSize:'0.82rem' }}>{side_effects.title}</div>
         <a href={side_effects.issue_url} target="_blank" rel="noreferrer"
-          style={{ color:'#38bdf8', fontSize:'0.78rem', display:'block', marginTop:'0.35rem' }}>
+          style={{ color:'#10b981', fontSize:'0.78rem', display:'block', marginTop:'0.35rem' }}>
           {side_effects.issue_url}
         </a>
       </div>
@@ -305,7 +305,7 @@ export default function App() {
   // ── Not authed ───────────────────────────────────────────
   if (isLoading) return (
     <div style={css.splash}>
-      <div style={{ color:'#334155', fontSize:'0.85rem' }}>Connecting…</div>
+      <div style={{ color:'#71717a', fontSize:'0.85rem' }}>Connecting…</div>
     </div>
   )
 
@@ -313,16 +313,16 @@ export default function App() {
     <div style={css.splash}>
       <div style={css.splashInner}>
         <div style={css.splashLogo}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <polyline points="9,12 11,14 15,10" stroke="#38bdf8" strokeWidth="2"/>
+            <polyline points="9,12 11,14 15,10" stroke="#10b981" strokeWidth="2"/>
           </svg>
         </div>
         <h1 style={css.splashTitle}>AegisFlow</h1>
         <p style={css.splashSub}>Policy-Enforced Consent for Autonomous AI Agents</p>
         <div style={css.splashMeta}>Powered by Auth0 Token Vault</div>
         {error && <div style={css.errBox}>{error.message}</div>}
-        <button onClick={() => loginWithRedirect()} style={css.btnPrimary}>
+        <button onClick={() => loginWithRedirect()} style={{...css.btnPrimary, width: '100%', justifyContent: 'center'}}>
           Initialize System
         </button>
       </div>
@@ -334,175 +334,180 @@ export default function App() {
 
   return (
     <div style={css.layout}>
-
       {/* ── Sidebar ── */}
       <aside style={css.sidebar}>
-        <div style={css.sidebarLogo}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <polyline points="9,12 11,14 15,10" stroke="#38bdf8" strokeWidth="2"/>
-          </svg>
-          <span style={{ color:'#e2e8f0', fontWeight:700, fontSize:'0.95rem', letterSpacing:'-0.01em' }}>
-            AegisFlow
-          </span>
+        <div style={css.sidebarHeader}>
+          <div style={css.sidebarLogo}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span style={{ color:'#e4e4e7', fontWeight:600, fontSize:'1rem', letterSpacing:'-0.01em' }}>
+              AegisFlow
+            </span>
+          </div>
+          <button style={css.newChatBtn} onClick={() => { setPlan(null); setExec(null); setPrompt(''); setStatus(''); inputRef.current?.focus() }}>
+            + New
+          </button>
         </div>
 
-        <nav style={{ display:'flex', flexDirection:'column', gap:'2px', flex:1 }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ ...css.navBtn, ...(tab === t.id ? css.navActive : {}) }}>
-              <span style={{ opacity: tab === t.id ? 1 : 0.5 }}><t.icon /></span>
-              {t.label}
-            </button>
-          ))}
-        </nav>
+        <div style={css.navGroup}>
+          <div style={css.navLabel}>System</div>
+          <nav style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{ ...css.navBtn, ...(tab === t.id ? css.navActive : {}) }}>
+                <span style={{ color: tab === t.id ? '#10b981' : '#71717a' }}><t.icon /></span>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <div style={css.userRow}>
           <div style={css.userAvatar}>{(user.nickname || user.email)?.[0]?.toUpperCase()}</div>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ color:'#94a3b8', fontSize:'0.72rem', whiteSpace:'nowrap',
-              overflow:'hidden', textOverflow:'ellipsis' }}>
+            <div style={{ color:'#e4e4e7', fontSize:'0.75rem', fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               {user.nickname || user.email}
             </div>
-            <div style={{ color:'#334155', fontSize:'0.65rem' }}>
-              {user.sub?.startsWith('github|') ? 'GitHub' : 'Auth0'}
+            <div style={{ color:'#71717a', fontSize:'0.65rem' }}>
+              {user.sub?.startsWith('github|') ? 'GitHub Connected' : 'Auth0 Session'}
             </div>
           </div>
           <button onClick={() => logout({ logoutParams:{ returnTo: window.location.origin } })}
-            style={css.xBtn}><Icon.X /></button>
+            style={css.iconBtn} title="Logout"><Icon.X /></button>
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* ── Main Content ── */}
       <main style={css.main}>
-
-        {/* ══ AGENT ══ */}
+        
+        {/* ══ AGENT TAB ══ */}
         {tab === 'agent' && (
-          <div style={css.page}>
-            <div style={css.pageHeader}>
-              <div>
-                <h2 style={css.pageTitle}>Agent Console</h2>
-                <p style={css.pageSub}>
-                  Low-risk actions execute instantly. High-risk actions require explicit consent.
-                </p>
-              </div>
-            </div>
-
-            <div style={css.inputWrap}>
-              <input ref={inputRef} value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleChat()}
-                placeholder="e.g. Show my repos  ·  Create an issue in owner/repo  ·  Delete owner/repo"
-                style={css.input} disabled={chatBusy || execBusy} />
-              <button onClick={handleChat} disabled={chatBusy || execBusy || !prompt.trim()} style={css.sendBtn}>
-                {chatBusy || execBusy
-                  ? <span style={{ width:14, height:14, border:'2px solid rgba(255,255,255,0.3)',
-                      borderTopColor:'white', borderRadius:'50%', display:'block',
-                      animation:'spin 0.7s linear infinite' }} />
-                  : <Icon.Send />}
-              </button>
-            </div>
-
-            {statusMsg && (
-              <div style={{ color:'#64748b', fontSize:'0.82rem', padding:'0.5rem 0', textAlign:'center' }}>
-                {statusMsg}
-              </div>
-            )}
-
-            {/* Plan card — shown for MEDIUM/HIGH risk */}
-            {planResult && !execResult && rc && (
-              <div style={{ ...css.card, borderColor: rc.border, background: rc.bg, marginTop:'1rem' }}>
-                <div style={css.cardRow}>
-                  <div>
-                    <span style={{ color: rc.color, fontSize:'0.72rem', fontWeight:700,
-                      textTransform:'uppercase', letterSpacing:'0.08em' }}>
-                      {rc.label} RISK · Step-up Auth Required
-                    </span>
-                    <p style={{ color:'#94a3b8', fontSize:'0.82rem', margin:'0.25rem 0 0' }}>
-                      {decision.reason}
-                    </p>
-                  </div>
-                  <div style={{ ...css.riskPill, background: rc.color }}>{rc.label}</div>
-                </div>
-
-                <div style={{ margin:'0.75rem 0', padding:'0.75rem',
-                  background:'rgba(0,0,0,0.2)', borderRadius:'6px',
-                  fontFamily:'JetBrains Mono, Fira Code, monospace', fontSize:'0.78rem', color:'#64748b' }}>
-                  {planResult.plan.actions.map((a, i) => (
-                    <div key={i} style={{ color:'#cbd5e1' }}>
-                      <span style={{ color:'#64748b' }}>action</span>
-                      <span style={{ color: rc.color }}> {a.action_type}</span>
-                      <span style={{ color:'#64748b' }}> on </span>
-                      <span style={{ color:'#e2e8f0' }}>{a.resource}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display:'flex', gap:'0.5rem', justifyContent:'flex-end' }}>
-                  <button onClick={() => setPlan(null)} style={css.btnGhost}>Cancel</button>
-                  <button onClick={handleExecute} disabled={execBusy}
-                    style={{ ...css.btnPrimary, background: rc.color, color:'#000',
-                      display:'flex', alignItems:'center', gap:'0.4rem' }}>
-                    <Icon.Lock />
-                    {execBusy ? 'Processing…' : 'Authorize & Execute'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Result */}
-            {execResult && (
-              <div style={{ ...css.card, borderColor:'rgba(34,197,94,0.3)', marginTop:'1rem' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                  marginBottom:'0.75rem' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:'0.4rem', color:'#22c55e',
-                    fontSize:'0.82rem', fontWeight:600 }}>
-                    <Icon.Check /> Execution complete
-                  </div>
-                  <div style={{ display:'flex', gap:'0.5rem', alignItems:'center' }}>
-                    {execResult.vault_used && (
-                      <span style={css.vaultBadge}>Token Vault</span>
-                    )}
-                    <button onClick={() => setExec(null)} style={css.xBtn}><Icon.X /></button>
-                  </div>
-                </div>
-                <ExecutionOutput result={execResult} />
-              </div>
-            )}
-
-            {/* Sample prompts */}
-            {!planResult && !execResult && !statusMsg && (
-              <div style={{ marginTop:'2rem' }}>
-                <div style={css.sectionLabel}>Try a command</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:'0.5rem', marginTop:'0.5rem' }}>
-                  {[
-                    ['Show my GitHub repositories', 'low'],
-                    ['Create an issue in owner/repo titled "Bug: login fails"', 'medium'],
-                    ['Create a private repo called my-project', 'medium'],
-                    ['Delete the repository owner/test-repo', 'high'],
-                  ].map(([cmd, risk]) => (
-                    <button key={cmd} onClick={() => { setPrompt(cmd); inputRef.current?.focus() }}
-                      style={{ ...css.promptChip, borderColor: RISK[risk].border, color:'#94a3b8' }}>
-                      <span style={{ width:6, height:6, borderRadius:'50%',
-                        background: RISK[risk].color, flexShrink:0 }} />
-                      {cmd}
+          <div style={css.chatContainer}>
+            
+            {/* Scrollable Output Area */}
+            <div style={css.chatOutput}>
+              {(!planResult && !execResult && !statusMsg) ? (
+                /* Empty State matching the screenshot layout */
+                <div style={css.emptyState}>
+                  <div style={css.glowingOrb} />
+                  <h1 style={css.welcomeTitle}>Welcome to AegisFlow</h1>
+                  <p style={css.welcomeSub}>Autonomous Security Gate. What would you like to execute?</p>
+                  
+                  <div style={css.quickActionGrid}>
+                    <button onClick={() => { setPrompt('Show my GitHub repositories'); inputRef.current?.focus() }} style={css.actionCard}>
+                      <div style={{ ...css.cardIcon, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}><Icon.Repo /></div>
+                      <div style={css.cardTitle}>Audit Repositories</div>
+                      <div style={css.cardDesc}>Low risk read-only operation.</div>
                     </button>
-                  ))}
+                    <button onClick={() => { setPrompt('Create an issue in Sarvesh5273/AegisFlow titled "Bug: login fails"'); inputRef.current?.focus() }} style={css.actionCard}>
+                      <div style={{ ...css.cardIcon, background:'rgba(249,115,22,0.1)', color:'#f97316' }}><Icon.Edit /></div>
+                      <div style={css.cardTitle}>Create Issue</div>
+                      <div style={css.cardDesc}>Medium risk state modification.</div>
+                    </button>
+                    <button onClick={() => { setPrompt('Delete the repository Sarvesh5273/AegisFlow'); inputRef.current?.focus() }} style={css.actionCard}>
+                      <div style={{ ...css.cardIcon, background:'rgba(239,68,68,0.1)', color:'#ef4444' }}><Icon.X /></div>
+                      <div style={css.cardTitle}>Delete Repository</div>
+                      <div style={css.cardDesc}>High risk destructive action.</div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Execution & Plan Flow */
+                <div style={css.flowContent}>
+                  {statusMsg && (
+                    <div style={css.statusPill}>
+                       <span style={css.spinner} /> {statusMsg}
+                    </div>
+                  )}
+
+                  {planResult && !execResult && rc && (
+                    <div style={{ ...css.executionCard, borderColor: rc.border, background: rc.bg }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1rem' }}>
+                        <div>
+                          <div style={{ color: rc.color, fontSize:'0.75rem', fontWeight:600, letterSpacing:'0.05em', textTransform:'uppercase' }}>
+                            {rc.label} RISK DETECTED
+                          </div>
+                          <h3 style={{ color:'#f4f4f5', fontSize:'1.1rem', marginTop:'0.25rem', fontWeight:500 }}>Step-up Auth Required</h3>
+                          <p style={{ color:'#a1a1aa', fontSize:'0.85rem', marginTop:'0.25rem' }}>{decision.reason}</p>
+                        </div>
+                        <div style={{ ...css.riskBadge, background: rc.color }}>{rc.label}</div>
+                      </div>
+
+                      <div style={css.codeBlock}>
+                        {planResult.plan.actions.map((a, i) => (
+                          <div key={i} style={{ marginBottom: i !== planResult.plan.actions.length - 1 ? '0.5rem' : 0 }}>
+                            <span style={{ color:'#71717a' }}>Action:</span> <span style={{ color: rc.color }}>{a.action_type}</span><br/>
+                            <span style={{ color:'#71717a' }}>Target:</span> <span style={{ color:'#e4e4e7' }}>{a.resource}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ display:'flex', gap:'0.75rem', justifyContent:'flex-end', marginTop:'1.25rem' }}>
+                        <button onClick={() => setPlan(null)} style={css.btnSecondary}>Cancel</button>
+                        <button onClick={handleExecute} disabled={execBusy} style={{ ...css.btnPrimary, background: rc.color, color:'#000' }}>
+                          <Icon.Lock /> {execBusy ? 'Processing…' : 'Authorize Execution'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {execResult && (
+                    <div style={{ ...css.executionCard, borderColor:'rgba(34,197,94,0.3)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', color:'#22c55e', fontWeight:500 }}>
+                          <Icon.Check /> Execution Complete
+                        </div>
+                        <div style={{ display:'flex', gap:'0.75rem', alignItems:'center' }}>
+                          {execResult.vault_used && <span style={css.vaultTag}>Auth0 Vault Used</span>}
+                          <button onClick={() => setExec(null)} style={css.iconBtn}><Icon.X /></button>
+                        </div>
+                      </div>
+                      <ExecutionOutput result={execResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Pinned Input Area */}
+            <div style={css.inputArea}>
+              <div style={css.inputWrapper}>
+                <input 
+                  ref={inputRef} 
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleChat()}
+                  placeholder="Ask AegisFlow to execute a command..."
+                  style={css.mainInput} 
+                  disabled={chatBusy || execBusy} 
+                />
+                <button onClick={handleChat} disabled={chatBusy || execBusy || !prompt.trim()} style={css.sendActionBtn}>
+                  {chatBusy || execBusy ? <span style={css.spinnerSmall} /> : <Icon.Send />}
+                </button>
+              </div>
+              <div style={css.inputFooter}>
+                <div style={{ display:'flex', gap:'1rem' }}>
+                  <button onClick={() => setTab('audit')} style={css.footerBtn}><Icon.Log /> Logs</button>
+                  <button onClick={() => setTab('policies')} style={css.footerBtn}><Icon.Policy /> Context</button>
+                </div>
+                <div style={{ color:'#52525b', fontSize:'0.7rem' }}>
+                  AegisFlow operations are cryptographically audited.
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
 
         {/* ══ AUDIT LOG ══ */}
         {tab === 'audit' && (
-          <div style={css.page}>
+          <div style={css.standardPage}>
             <div style={css.pageHeader}>
               <div>
                 <h2 style={css.pageTitle}>Audit Log</h2>
                 <p style={css.pageSub}>Every action, consent, and GitHub operation — cryptographically logged.</p>
               </div>
-              <button onClick={loadAudit} style={css.btnGhost} disabled={auditBusy}>
+              <button onClick={loadAudit} style={css.btnSecondary} disabled={auditBusy}>
                 <Icon.Refresh /> {auditBusy ? 'Loading…' : 'Refresh'}
               </button>
             </div>
@@ -518,19 +523,17 @@ export default function App() {
                     return (
                       <div key={l.id} style={{ ...css.logRow, borderLeftColor: isSuccess ? '#22c55e' : '#ef4444' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.2rem' }}>
-                          <span style={{ color:'#e2e8f0', fontFamily:'monospace', fontSize:'0.8rem' }}>
+                          <span style={{ color:'#e4e4e7', fontFamily:'monospace', fontSize:'0.8rem' }}>
                             {l.action_type}
                           </span>
-                          <span style={{ fontSize:'0.7rem', color: isSuccess ? '#22c55e' : '#ef4444',
-                            fontWeight:600, textTransform:'uppercase' }}>
+                          <span style={{ fontSize:'0.7rem', color: isSuccess ? '#22c55e' : '#ef4444', fontWeight:600, textTransform:'uppercase' }}>
                             {l.status}
                           </span>
                         </div>
-                        <div style={{ color:'#475569', fontSize:'0.75rem' }}>{l.resource}</div>
+                        <div style={{ color:'#a1a1aa', fontSize:'0.75rem' }}>{l.resource}</div>
                         <div style={{ display:'flex', justifyContent:'space-between', marginTop:'0.25rem' }}>
-                          <span style={{ ...css.riskPill, background: rc2.color, fontSize:'0.62rem',
-                            padding:'0.1rem 0.4rem' }}>{l.risk_level}</span>
-                          <span style={{ color:'#334155', fontSize:'0.68rem' }}>
+                          <span style={{ ...css.riskBadge, background: rc2.color }}>{l.risk_level}</span>
+                          <span style={{ color:'#71717a', fontSize:'0.68rem' }}>
                             {new Date(l.executed_at).toLocaleTimeString()}
                           </span>
                         </div>
@@ -544,14 +547,14 @@ export default function App() {
                 {consents.length === 0
                   ? <Empty text="No consents recorded." />
                   : consents.map(c => (
-                    <div key={c.id} style={{ ...css.logRow, borderLeftColor:'#38bdf8' }}>
-                      <div style={{ color:'#e2e8f0', fontFamily:'monospace', fontSize:'0.8rem' }}>
+                    <div key={c.id} style={{ ...css.logRow, borderLeftColor:'#10b981' }}>
+                      <div style={{ color:'#e4e4e7', fontFamily:'monospace', fontSize:'0.8rem' }}>
                         {c.action_type}
                       </div>
-                      <div style={{ color:'#475569', fontSize:'0.73rem', marginTop:'0.15rem' }}>
+                      <div style={{ color:'#a1a1aa', fontSize:'0.73rem', marginTop:'0.15rem' }}>
                         scope: {c.scope_granted}
                       </div>
-                      <div style={{ color:'#334155', fontSize:'0.68rem', marginTop:'0.15rem' }}>
+                      <div style={{ color:'#71717a', fontSize:'0.68rem', marginTop:'0.15rem' }}>
                         {new Date(c.granted_at).toLocaleTimeString()}
                       </div>
                     </div>
@@ -562,10 +565,10 @@ export default function App() {
                   ? <Empty text="No GitHub operations." />
                   : ghState.map(g => (
                     <div key={g.id} style={{ ...css.logRow, borderLeftColor:'#a78bfa' }}>
-                      <div style={{ color:'#e2e8f0', fontFamily:'monospace', fontSize:'0.8rem' }}>
+                      <div style={{ color:'#e4e4e7', fontFamily:'monospace', fontSize:'0.8rem' }}>
                         {g.action}
                       </div>
-                      <div style={{ color:'#475569', fontSize:'0.73rem' }}>{g.repo}</div>
+                      <div style={{ color:'#a1a1aa', fontSize:'0.73rem' }}>{g.repo}</div>
                     </div>
                   ))}
               </div>
@@ -575,13 +578,13 @@ export default function App() {
 
         {/* ══ POLICIES ══ */}
         {tab === 'policies' && (
-          <div style={css.page}>
+          <div style={css.standardPage}>
             <div style={css.pageHeader}>
               <div>
                 <h2 style={css.pageTitle}>Policy Registry</h2>
                 <p style={css.pageSub}>Runtime-editable. Changes take effect immediately without restarting.</p>
               </div>
-              <button onClick={handleResetPolicies} style={css.btnGhost}>
+              <button onClick={handleResetPolicies} style={css.btnSecondary}>
                 <Icon.Refresh /> Reset
               </button>
             </div>
@@ -597,22 +600,22 @@ export default function App() {
                 return (
                   <div key={p.action_type} style={{ ...css.card,
                     borderColor: isEditing ? rc2.color : rc2.border,
-                    background: isEditing ? rc2.bg : 'rgba(255,255,255,0.02)' }}>
-                    <div style={css.cardRow}>
-                      <div style={{ fontFamily:'JetBrains Mono, monospace', color:'#e2e8f0',
-                        fontSize:'0.82rem' }}>{p.action_type}</div>
-                      <div style={{ ...css.riskPill, background: rc2.color }}>{rc2.label}</div>
+                    background: isEditing ? rc2.bg : '#18181b' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'0.5rem' }}>
+                      <div style={{ fontFamily:'JetBrains Mono, monospace', color:'#e4e4e7', fontSize:'0.82rem' }}>
+                        {p.action_type}
+                      </div>
+                      <div style={{ ...css.riskBadge, background: rc2.color }}>{rc2.label}</div>
                     </div>
-                    <p style={{ color:'#64748b', fontSize:'0.8rem', margin:'0.3rem 0 0.75rem' }}>
+                    <p style={{ color:'#a1a1aa', fontSize:'0.8rem', margin:'0.3rem 0 0.75rem' }}>
                       {p.description}
                     </p>
 
                     {!isEditing ? (
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span style={{ color:'#475569', fontSize:'0.75rem', display:'flex',
-                          alignItems:'center', gap:'0.3rem' }}>
+                        <span style={{ color:'#a1a1aa', fontSize:'0.75rem', display:'flex', alignItems:'center', gap:'0.3rem' }}>
                           {p.requires_step_up
-                            ? <><Icon.Lock /><span style={{ color:'#64748b' }}>Step-up required</span></>
+                            ? <><Icon.Lock /><span style={{ color:'#a1a1aa' }}>Step-up required</span></>
                             : <><Icon.Check /><span style={{ color:'#22c55e' }}>Auto-approve</span></>}
                         </span>
                         <button onClick={() => setEditing({...p})} style={css.editBtn}>
@@ -632,15 +635,15 @@ export default function App() {
                           </select>
                         </div>
                         <label style={{ display:'flex', alignItems:'center', gap:'0.5rem',
-                          color:'#94a3b8', fontSize:'0.82rem', cursor:'pointer' }}>
+                          color:'#a1a1aa', fontSize:'0.82rem', cursor:'pointer' }}>
                           <input type="checkbox" checked={editingPolicy.requires_step_up}
                             onChange={e => setEditing({...editingPolicy, requires_step_up: e.target.checked})}
-                            style={{ accentColor:'#38bdf8' }} />
+                            style={{ accentColor:'#10b981' }} />
                           Requires step-up authentication
                         </label>
                         <div style={{ display:'flex', gap:'0.5rem', marginTop:'0.25rem' }}>
                           <button onClick={handleSavePolicy} style={css.btnPrimary}>Save</button>
-                          <button onClick={() => setEditing(null)} style={css.btnGhost}>Cancel</button>
+                          <button onClick={() => setEditing(null)} style={css.btnSecondary}>Cancel</button>
                         </div>
                       </div>
                     )}
@@ -653,7 +656,7 @@ export default function App() {
 
         {/* ══ TOKEN VAULT ══ */}
         {tab === 'vault' && (
-          <div style={css.page}>
+          <div style={css.standardPage}>
             <div style={css.pageHeader}>
               <div>
                 <h2 style={css.pageTitle}>Auth0 Token Vault</h2>
@@ -661,7 +664,7 @@ export default function App() {
                   Stored third-party credentials. The agent retrieves these to call APIs without seeing your password.
                 </p>
               </div>
-              <button onClick={loadAudit} style={css.btnGhost} disabled={auditBusy}>
+              <button onClick={loadAudit} style={css.btnSecondary} disabled={auditBusy}>
                 <Icon.Refresh /> {auditBusy ? 'Loading…' : 'Refresh'}
               </button>
             </div>
@@ -677,9 +680,10 @@ export default function App() {
                   'The GitHub API is called. Your raw credential never left Auth0.',
                 ].map((text, i) => (
                   <div key={i} style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start' }}>
-                    <span style={{ ...css.riskPill, background:'#38bdf8', color:'#000',
-                      flexShrink:0, minWidth:20, textAlign:'center' }}>{i+1}</span>
-                    <span style={{ color:'#94a3b8', fontSize:'0.85rem', lineHeight:1.5 }}>{text}</span>
+                    <span style={{ background:'#10b981', color:'#000', borderRadius:'20px', padding:'0.15rem 0.5rem', fontSize:'0.65rem', fontWeight:700, flexShrink:0, minWidth:20, textAlign:'center' }}>
+                      {i+1}
+                    </span>
+                    <span style={{ color:'#a1a1aa', fontSize:'0.85rem', lineHeight:1.5 }}>{text}</span>
                   </div>
                 ))}
               </div>
@@ -688,26 +692,23 @@ export default function App() {
             <div style={css.card}>
               <div style={css.sectionLabel}>Linked Connections</div>
               {vaultConns.length === 0 ? (
-                <div style={{ color:'#334155', fontSize:'0.85rem', marginTop:'0.75rem' }}>
+                <div style={{ color:'#71717a', fontSize:'0.85rem', marginTop:'0.75rem' }}>
                   No connections found. Log in with GitHub to enable Token Vault.
                 </div>
               ) : (
                 vaultConns.map(c => (
-                  <div key={c.connection} style={{ ...css.logRow, marginTop:'0.5rem',
-                    borderLeftColor: c.has_token ? '#22c55e' : '#334155' }}>
+                  <div key={c.connection} style={{ ...css.logRow, marginTop:'0.5rem', borderLeftColor: c.has_token ? '#22c55e' : '#3f3f46' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ color:'#e2e8f0', fontFamily:'monospace', fontSize:'0.85rem' }}>
+                      <span style={{ color:'#e4e4e7', fontFamily:'monospace', fontSize:'0.85rem' }}>
                         {c.connection}
                       </span>
-                      <span style={{ fontSize:'0.75rem', display:'flex', alignItems:'center', gap:'0.3rem',
-                        color: c.has_token ? '#22c55e' : '#475569' }}>
+                      <span style={{ fontSize:'0.75rem', display:'flex', alignItems:'center', gap:'0.3rem', color: c.has_token ? '#22c55e' : '#71717a' }}>
                         {c.has_token && <Icon.Check />}
                         {c.has_token ? 'Token stored in vault' : 'No token stored'}
                       </span>
                     </div>
                     {c.user_id && (
-                      <div style={{ color:'#334155', fontSize:'0.7rem', marginTop:'0.2rem',
-                        fontFamily:'monospace' }}>{c.user_id}</div>
+                      <div style={{ color:'#71717a', fontSize:'0.7rem', marginTop:'0.2rem', fontFamily:'monospace' }}>{c.user_id}</div>
                     )}
                   </div>
                 ))
@@ -721,13 +722,13 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #050a14; }
+        body { background: #09090b; }
         @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
-        input::placeholder { color: #334155; }
-        select option { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
+        input::placeholder { color: #52525b; }
+        select option { background: #18181b; }
       `}</style>
     </div>
   )
@@ -735,14 +736,15 @@ export default function App() {
 
 // ── Small helpers ────────────────────────────────────────────
 function Empty({ text }) {
-  return <p style={{ color:'#334155', fontSize:'0.82rem', padding:'0.4rem 0' }}>{text}</p>
+  return <p style={{ color:'#71717a', fontSize:'0.82rem', padding:'0.4rem 0' }}>{text}</p>
 }
 
-// ── Styles ───────────────────────────────────────────────────
+// ── Combined Styles ───────────────────────────────────────────────────
 const css = {
+  // Splash Screen
   splash: {
     minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
-    background:'#050a14', fontFamily:"'Sora', system-ui, sans-serif",
+    background:'#09090b', fontFamily:"system-ui, -apple-system, sans-serif",
   },
   splashInner: {
     display:'flex', flexDirection:'column', alignItems:'center',
@@ -750,157 +752,163 @@ const css = {
   },
   splashLogo: {
     width:72, height:72, borderRadius:'50%',
-    background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.15)',
+    background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.15)',
     display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'1.5rem',
   },
   splashTitle: {
-    fontSize:'2.5rem', fontWeight:700, color:'#f1f5f9', letterSpacing:'-0.03em',
-    marginBottom:'0.5rem',
+    fontSize:'2.5rem', fontWeight:700, color:'#f4f4f5', letterSpacing:'-0.03em', marginBottom:'0.5rem',
   },
-  splashSub: { color:'#475569', fontSize:'0.9rem', lineHeight:1.6, marginBottom:'0.5rem' },
+  splashSub: { color:'#a1a1aa', fontSize:'0.9rem', lineHeight:1.6, marginBottom:'0.5rem' },
   splashMeta: {
-    color:'#1e3a5f', fontSize:'0.75rem', fontFamily:'monospace',
-    border:'1px solid #1e293b', padding:'0.2rem 0.75rem', borderRadius:'20px',
-    marginBottom:'2rem',
+    color:'#10b981', fontSize:'0.75rem', fontFamily:'monospace',
+    border:'1px solid rgba(16,185,129,0.2)', padding:'0.2rem 0.75rem', borderRadius:'20px', marginBottom:'2rem',
   },
+  
+  // Layout & Sidebar
   layout: {
     display:'flex', minHeight:'100vh',
-    background:'#050a14', fontFamily:"'Sora', system-ui, sans-serif",
-    color:'white',
+    background:'#09090b', /* Deep slate background */
+    fontFamily:"system-ui, -apple-system, sans-serif",
+    color:'#f4f4f5',
   },
   sidebar: {
-    width:200, flexShrink:0,
-    background:'#070d1a', borderRight:'1px solid rgba(255,255,255,0.04)',
-    display:'flex', flexDirection:'column', padding:'1.25rem 0.75rem',
+    width: 260, flexShrink: 0,
+    background: '#09090b', borderRight: '1px solid #27272a',
+    display: 'flex', flexDirection: 'column', padding: '1rem',
   },
-  sidebarLogo: {
-    display:'flex', alignItems:'center', gap:'0.5rem',
-    marginBottom:'2rem', padding:'0 0.25rem',
+  sidebarHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'
+  },
+  sidebarLogo: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  newChatBtn: {
+    background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none',
+    padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem',
+    fontWeight: 500, cursor: 'pointer', transition: 'background 0.2s'
+  },
+  navGroup: { marginBottom: '2rem' },
+  navLabel: {
+    color: '#52525b', fontSize: '0.7rem', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', paddingLeft: '0.5rem'
   },
   navBtn: {
-    background:'none', border:'none', color:'#475569',
-    textAlign:'left', padding:'0.55rem 0.75rem',
-    borderRadius:'6px', cursor:'pointer', fontSize:'0.83rem',
-    display:'flex', alignItems:'center', gap:'0.5rem',
-    transition:'all 0.15s',
+    background: 'transparent', border: 'none', color: '#a1a1aa',
+    textAlign: 'left', padding: '0.5rem 0.75rem',
+    borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500,
+    display: 'flex', alignItems: 'center', gap: '0.6rem', transition: 'all 0.15s',
   },
-  navActive: { background:'rgba(255,255,255,0.05)', color:'#e2e8f0' },
+  navActive: { background: '#18181b', color: '#f4f4f5' },
   userRow: {
-    display:'flex', alignItems:'center', gap:'0.5rem',
-    padding:'0.6rem 0.5rem', borderRadius:'8px',
-    background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)',
-    marginTop:'auto',
+    display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.75rem', borderRadius:'8px',
+    background:'#18181b', border:'1px solid #27272a', marginTop:'auto',
   },
   userAvatar: {
-    width:26, height:26, borderRadius:'50%',
-    background:'linear-gradient(135deg,#38bdf8,#818cf8)',
-    color:'#000', display:'flex', alignItems:'center', justifyContent:'center',
-    fontWeight:700, fontSize:'0.72rem', flexShrink:0,
+    width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg, #10b981, #047857)',
+    color:'#fff', display:'flex', alignItems:'center', justifyContent:'center',
+    fontWeight:600, fontSize:'0.8rem', flexShrink:0,
   },
-  xBtn: {
-    background:'none', border:'none', color:'#334155',
-    cursor:'pointer', padding:'2px', display:'flex', alignItems:'center',
-    flexShrink:0,
+  iconBtn: {
+    background:'none', border:'none', color:'#71717a', cursor:'pointer', padding:'4px',
+    display:'flex', alignItems:'center', borderRadius: '4px', transition: 'color 0.2s'
   },
-  main: { flex:1, overflowY:'auto', minWidth:0 },
-  page: { padding:'2rem 2.5rem', maxWidth:900 },
-  pageHeader: {
-    display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-    marginBottom:'1.5rem', gap:'1rem',
+  
+  // Main Area & The Grid Background
+  main: { 
+    flex: 1, position: 'relative', display: 'flex', flexDirection: 'column',
+    /* The dotted grid from the screenshot, adapted for dark mode */
+    backgroundImage: 'radial-gradient(#27272a 1px, transparent 1px)', backgroundSize: '24px 24px',
+    overflowY: 'auto'
   },
-  pageTitle: {
-    fontSize:'1.35rem', fontWeight:700, color:'#f1f5f9',
-    letterSpacing:'-0.02em', marginBottom:'0.2rem',
+  chatContainer: { display: 'flex', flexDirection: 'column', height: '100vh' },
+  chatOutput: { flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column' },
+  
+  // Empty State & Cards
+  emptyState: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    maxWidth: '800px', margin: '0 auto', width: '100%',
   },
-  pageSub: { color:'#475569', fontSize:'0.82rem' },
-  inputWrap: {
-    display:'flex', gap:'0.5rem', alignItems:'center',
-    background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)',
-    borderRadius:'10px', padding:'0.5rem 0.5rem 0.5rem 1rem',
+  glowingOrb: {
+    width: '64px', height: '64px', borderRadius: '50%',
+    background: 'radial-gradient(circle at 30% 30%, #4ade80, #059669)',
+    boxShadow: '0 0 40px rgba(16, 185, 129, 0.4)', marginBottom: '1.5rem'
   },
-  input: {
-    flex:1, background:'none', border:'none', color:'#e2e8f0',
-    fontSize:'0.9rem', outline:'none', fontFamily:"'Sora', system-ui, sans-serif",
+  welcomeTitle: { fontSize: '2rem', fontWeight: 600, color: '#f4f4f5', marginBottom: '0.5rem', letterSpacing: '-0.02em' },
+  welcomeSub: { color: '#a1a1aa', fontSize: '1rem', marginBottom: '3rem' },
+  quickActionGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', width: '100%' },
+  actionCard: {
+    background: '#18181b', border: '1px solid #27272a', borderRadius: '12px',
+    padding: '1.25rem', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s',
+    display: 'flex', flexDirection: 'column', gap: '0.75rem',
   },
-  sendBtn: {
-    width:36, height:36, borderRadius:'7px', background:'#38bdf8',
-    border:'none', color:'#000', cursor:'pointer',
-    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+  cardIcon: { width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: '#f4f4f5', fontWeight: 500, fontSize: '0.9rem' },
+  cardDesc: { color: '#71717a', fontSize: '0.8rem', lineHeight: 1.4 },
+
+  // Input Area (Pinned to bottom)
+  inputArea: { padding: '0 2rem 2rem 2rem', maxWidth: '900px', margin: '0 auto', width: '100%', flexShrink: 0 },
+  inputWrapper: {
+    background: '#18181b', border: '1px solid #10b981', boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)',
+    borderRadius: '16px', padding: '0.5rem 0.5rem 0.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem',
   },
-  card: {
-    background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)',
-    borderRadius:'10px', padding:'1.1rem', marginBottom:'0.75rem',
+  mainInput: {
+    flex: 1, background: 'transparent', border: 'none', color: '#f4f4f5',
+    fontSize: '1rem', outline: 'none', padding: '0.75rem 0',
   },
-  cardRow: {
-    display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-    marginBottom:'0.5rem',
+  sendActionBtn: {
+    width: '40px', height: '40px', borderRadius: '10px', background: '#10b981', color: '#000', border: 'none',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  riskPill: {
-    padding:'0.15rem 0.5rem', borderRadius:'20px',
-    fontSize:'0.65rem', fontWeight:700, color:'#000', letterSpacing:'0.04em',
+  inputFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', padding: '0 0.5rem' },
+  footerBtn: { background: 'none', border: 'none', color: '#71717a', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' },
+
+  // Execution Flow
+  flowContent: { maxWidth: '800px', margin: '0 auto', width: '100%' },
+  executionCard: { background: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '1.5rem', marginBottom: '1rem' },
+  codeBlock: {
+    background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '1rem',
+    fontFamily: 'JetBrains Mono, monospace', fontSize: '0.85rem', marginTop: '1rem'
   },
-  vaultBadge: {
-    background:'rgba(56,189,248,0.1)', color:'#38bdf8',
-    border:'1px solid rgba(56,189,248,0.2)',
-    padding:'0.15rem 0.5rem', borderRadius:'4px',
-    fontSize:'0.7rem', fontWeight:600,
-  },
-  sectionLabel: {
-    color:'#334155', fontSize:'0.7rem', fontWeight:600,
-    textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:'0.5rem',
-  },
-  logRow: {
-    background:'rgba(255,255,255,0.02)', padding:'0.65rem 0.75rem',
-    borderRadius:'6px', marginBottom:'0.35rem',
-    borderLeft:'2px solid transparent',
-  },
-  promptChip: {
-    background:'rgba(255,255,255,0.02)', border:'1px solid transparent',
-    color:'#64748b', padding:'0.35rem 0.75rem', borderRadius:'20px',
-    fontSize:'0.75rem', cursor:'pointer',
-    display:'flex', alignItems:'center', gap:'0.4rem',
-    transition:'all 0.15s',
-  },
+  riskBadge: { padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#000', letterSpacing:'0.04em' },
+  vaultTag: { background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 500 },
+  
+  // Buttons
   btnPrimary: {
-    background:'#38bdf8', color:'#000', border:'none',
-    padding:'0.6rem 1.1rem', borderRadius:'7px',
-    fontWeight:600, cursor:'pointer', fontSize:'0.85rem',
-    display:'flex', alignItems:'center', gap:'0.4rem',
-    fontFamily:"'Sora', system-ui, sans-serif",
+    background: '#10b981', color: '#000', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px',
+    fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem',
   },
-  btnGhost: {
-    background:'rgba(255,255,255,0.03)', color:'#64748b',
-    border:'1px solid rgba(255,255,255,0.07)',
-    padding:'0.5rem 0.9rem', borderRadius:'7px',
-    cursor:'pointer', fontSize:'0.8rem',
-    display:'flex', alignItems:'center', gap:'0.4rem',
-    fontFamily:"'Sora', system-ui, sans-serif",
+  btnSecondary: {
+    background: 'transparent', color: '#a1a1aa', border: '1px solid #27272a', padding: '0.5rem 1rem', borderRadius: '8px',
+    cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem',
   },
   editBtn: {
-    background:'none', border:'1px solid rgba(255,255,255,0.07)',
-    color:'#475569', padding:'0.3rem 0.6rem', borderRadius:'5px',
-    cursor:'pointer', fontSize:'0.75rem',
-    display:'flex', alignItems:'center', gap:'0.3rem',
+    background:'none', border:'1px solid #27272a', color:'#a1a1aa', padding:'0.3rem 0.6rem', borderRadius:'5px',
+    cursor:'pointer', fontSize:'0.75rem', display:'flex', alignItems:'center', gap:'0.3rem',
   },
-  infoBox: {
-    background:'rgba(34,197,94,0.07)', color:'#86efac',
-    border:'1px solid rgba(34,197,94,0.2)',
-    padding:'0.6rem 1rem', borderRadius:'7px', fontSize:'0.82rem',
+
+  // Utils & Status
+  statusPill: {
+    display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: '#18181b', border: '1px solid #27272a',
+    padding: '0.5rem 1rem', borderRadius: '20px', color: '#a1a1aa', fontSize: '0.8rem', marginBottom: '1rem', alignSelf: 'center'
   },
-  errBox: {
-    background:'rgba(239,68,68,0.08)', color:'#fca5a5',
-    border:'1px solid rgba(239,68,68,0.2)',
-    padding:'0.6rem 1rem', borderRadius:'7px',
-    fontSize:'0.85rem', marginBottom:'1rem',
-  },
-  formLabel: { color:'#475569', fontSize:'0.75rem', marginBottom:'0.25rem' },
-  select: {
-    width:'100%', background:'#0a1220',
-    border:'1px solid rgba(255,255,255,0.07)',
-    color:'#e2e8f0', padding:'0.4rem 0.6rem',
-    borderRadius:'6px', fontSize:'0.82rem',
-    fontFamily:"'Sora', system-ui, sans-serif",
-  },
+  spinner: { width: '12px', height: '12px', border: '2px solid #52525b', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  spinnerSmall: { width: '16px', height: '16px', border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  sectionLabel: { color:'#52525b', fontSize:'0.7rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:'0.5rem' },
+  infoBox: { background:'rgba(34,197,94,0.07)', color:'#86efac', border:'1px solid rgba(34,197,94,0.2)', padding:'0.6rem 1rem', borderRadius:'7px', fontSize:'0.82rem' },
+  errBox: { background:'rgba(239,68,68,0.08)', color:'#fca5a5', border:'1px solid rgba(239,68,68,0.2)', padding:'0.6rem 1rem', borderRadius:'7px', fontSize:'0.85rem', marginBottom:'1rem' },
+
+  // Standard Pages (Audit, Policies, Vault)
+  standardPage: { padding: '3rem', maxWidth: '1000px', margin: '0 auto' },
+  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' },
+  pageTitle: { fontSize: '1.5rem', fontWeight: 600, color: '#f4f4f5', marginBottom: '0.25rem' },
+  pageSub: { color: '#a1a1aa', fontSize: '0.875rem' },
+  
+  // Lists & Grids (Old UI migrated to new colors)
+  card: { background:'#18181b', border:'1px solid #27272a', borderRadius:'10px', padding:'1.1rem', marginBottom:'0.75rem' },
+  logRow: { background:'#18181b', padding:'0.65rem 0.75rem', borderRadius:'6px', marginBottom:'0.35rem', borderLeft:'2px solid transparent' },
   auditGrid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' },
   policyGrid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' },
+  formLabel: { color:'#a1a1aa', fontSize:'0.75rem', marginBottom:'0.25rem' },
+  select: {
+    width:'100%', background:'#09090b', border:'1px solid #27272a', color:'#e4e4e7',
+    padding:'0.4rem 0.6rem', borderRadius:'6px', fontSize:'0.82rem', fontFamily:"system-ui, -apple-system, sans-serif",
+  },
 }
